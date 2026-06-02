@@ -1,0 +1,50 @@
+[
+  {
+    "id": "dev-resume",
+    "title": "개발자 마크다운 이력서 템플릿",
+    "description": "가독성이 좋고 깔끔하게 정리된 개발자 신입 및 경력 공용 마크다운 이력서 양식입니다.",
+    "category": "Resume",
+    "filePath": "resume.md",
+    "author": "개발자"
+  },
+  {
+    "id": "readme-standard",
+    "title": "표준 GitHub README 템플릿",
+    "description": "오픈소스 및 회사 프로젝트 소개용 표준 리드미 양식입니다. 설치법, 기여 가이드 등을 포함합니다.",
+    "category": "Documentation",
+    "filePath": "readme.md",
+    "author": "개발자"
+  },
+  {
+    "id": "weekly-meeting",
+    "title": "주간 스프린트 회의록 템플릿",
+    "description": "팀 내 주간 미팅과 스프린트 일정, 주요 결정 사항을 기록하기 위한 깔끔한 양식입니다.",
+    "category": "Meeting",
+    "filePath": "meeting.md",
+    "author": "개발자"
+  },
+  {
+    "id": "tech-blog-post",
+    "title": "기술 블로그 포스트 포맷",
+    "description": "개인 기술 블로그나 미디엄에 포스팅할 때 유용하게 사용할 수 있는 가이드라인과 섹션 서식입니다.",
+    "category": "Blog",
+    "filePath": "blog.md",
+    "author": "개발자"
+  },
+  {
+    "id": "project-planning",
+    "title": "신규 프로젝트 기획 제안서",
+    "description": "배경, 목표, 추진 전략, 일정표 등을 정리하여 상위에 기안하기 적합한 공식 기획 템플릿입니다.",
+    "category": "Planning",
+    "filePath": "planning.md",
+    "author": "개발자"
+  },
+  {
+    "id": "quarterly-report",
+    "title": "분기 업무 성과 보고서",
+    "description": "한 분기 동안의 작업 내용, 주요 성과 지표(KPI) 및 다음 업무 계획을 보고하기 위한 표준 양식입니다.",
+    "category": "Report",
+    "filePath": "report.md",
+    "author": "개발자"
+  }
+]

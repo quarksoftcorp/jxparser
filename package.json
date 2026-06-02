@@ -1,0 +1,17 @@
+{
+  "name": "jxmparser-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "web:dev": "npm run dev --workspace=web",
+    "web:build": "npm run build --workspace=web",
+    "mobile:start": "npm run start --workspace=mobile"
+  },
+  "dependencies": {
+    "puppeteer": "^25.1.0"
+  }
+}

@@ -1,0 +1,27 @@
+# Firebase App Hosting Configuration
+# Reference: https://firebase.google.com/docs/app-hosting/configure
+
+schemaVersion: v1
+
+# 빌드 설정
+buildConfig:
+  # 빌드 시 사용할 Node.js 버전 지정
+  nodeVersion: 20
+
+# 런타임 환경 설정
+runConfig:
+  # 웹 앱이 실행될 포트 (기본값 8080)
+  port: 8080
+  
+  # CPU 및 메모리 제한 사양 정의
+  cpu: 1
+  memoryMiB: 512
+
+  # 최소/최대 인스턴스 제한 (비용 제어)
+  minInstances: 0
+  maxInstances: 2
+
+# 환경 변수 정의 (필요 시 주석 제거하여 사용)
+# env:
+#   - name: NEXT_PUBLIC_API_URL
+#     value: https://api.jxmparser-daimontech.web.app
