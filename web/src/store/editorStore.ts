@@ -13,8 +13,9 @@ import {
   generateId
 } from '../utils/parser';
 import { mobileCache } from '../utils/mobileBridge';
-import { db } from '../utils/firebase';
-import { collection, getDocs, addDoc, query, orderBy, limit, Timestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { db, auth, googleProvider } from '../utils/firebase';
+import { collection, getDocs, addDoc, query, orderBy, limit, Timestamp, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
+import { User, signInWithPopup, signOut as fbSignOut, onAuthStateChanged } from 'firebase/auth';
 
 export interface TabFile {
   id: string;
@@ -35,6 +36,10 @@ export interface Template {
   author: string;
   stars?: number;
   forks?: number;
+  uid?: string;
+  starredUids?: string[];
+  isPrompt?: boolean;
+  targetModel?: string;
 }
 
 interface EditorState {
@@ -47,9 +52,13 @@ interface EditorState {
   templatesLoading: boolean;
   templatesError: string | null;
 
+  // 사용자 인증 상태 추가
+  user: User | null;
+  authLoading: boolean;
+
   // 공유 스토어 상태 추가
   shareOpen: boolean;
-  storeTab: 'official' | 'community';
+  storeTab: 'official' | 'community' | 'prompt' | 'mine';
   communityTemplates: Template[];
   communityLoading: boolean;
   communityError: string | null;
@@ -71,13 +80,19 @@ interface EditorState {
   fetchTemplates: () => Promise<void>;
   loadTemplate: (template: Template) => Promise<void>;
 
+  // 사용자 인증 액션 추가
+  signInWithGoogle: () => Promise<void>;
+  signOutUser: () => Promise<void>;
+  initializeAuth: () => void;
+
   // 공유 스토어 액션 추가
   setShareOpen: (open: boolean) => void;
-  setStoreTab: (tab: 'official' | 'community') => void;
-  shareTemplate: (title: string, description: string, category: string, author: string) => Promise<boolean>;
+  setStoreTab: (tab: 'official' | 'community' | 'prompt' | 'mine') => void;
+  shareTemplate: (title: string, description: string, category: string, author: string, isPrompt?: boolean, targetModel?: string) => Promise<boolean>;
   fetchCommunityTemplates: () => Promise<void>;
   starTemplate: (templateId: string) => Promise<void>;
   forkTemplate: (template: Template) => Promise<void>;
+  deleteTemplate: (templateId: string) => Promise<boolean>;
 }
 
 // 예제 데이터 정의
@@ -173,6 +188,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
     templates: [],
     templatesLoading: false,
     templatesError: null,
+
+    // 사용자 인증 기본 상태
+    user: null,
+    authLoading: true,
 
     // 공유 스토어 기본 상태
     shareOpen: false,
@@ -428,8 +447,12 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set({ storeTab: tab });
     },
 
-    shareTemplate: async (title, description, category, author) => {
-      const { files, activeTabId } = get();
+    shareTemplate: async (title, description, category, author, isPrompt = false, targetModel = '') => {
+      const { files, activeTabId, user, t } = get();
+      if (!user) {
+        alert(t('loginRequired'));
+        return false;
+      }
       if (!activeTabId) return false;
       const activeFile = files.find(f => f.id === activeTabId);
       if (!activeFile || activeFile.type !== 'md') return false;
@@ -438,9 +461,12 @@ export const useEditorStore = create<EditorState>((set, get) => {
         title,
         description,
         category,
-        author: author.trim() || 'Anonymous',
+        author: author.trim() || user.displayName || 'Anonymous',
+        uid: user.uid,
         content: activeFile.content,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isPrompt,
+        targetModel: isPrompt ? targetModel : ''
       };
 
       if (!db) {
@@ -509,9 +535,13 @@ export const useEditorStore = create<EditorState>((set, get) => {
             category: data.category || 'General',
             filePath: '',
             author: data.author || 'Anonymous',
+            uid: data.uid || '',
             content: data.content || '',
             stars: data.stars || 0,
-            forks: data.forks || 0
+            forks: data.forks || 0,
+            starredUids: data.starredUids || [],
+            isPrompt: data.isPrompt !== undefined ? data.isPrompt : true,
+            targetModel: data.targetModel || 'General'
           } as any);
         });
         set({ communityTemplates: fetchedTemplates, communityLoading: false });
@@ -529,53 +559,59 @@ export const useEditorStore = create<EditorState>((set, get) => {
     },
 
     starTemplate: async templateId => {
-      // 로컬 스토리지에서 중복 추천 검사
-      const starredStr = localStorage.getItem('starred_templates') || '[]';
-      const starredList: string[] = JSON.parse(starredStr);
-      if (starredList.includes(templateId)) {
-        alert(get().t('starredAlert'));
+      const { user, t } = get();
+      if (!user) {
+        alert(t('loginRequired'));
         return;
       }
 
+      // 대상 템플릿의 기존 추천 UID 목록 확보
+      const targetTemplate = get().communityTemplates.find(tmpl => tmpl.id === templateId) || get().templates.find(tmpl => tmpl.id === templateId);
+      const currentStarredUids = targetTemplate?.starredUids || [];
+      const hasStarred = currentStarredUids.includes(user.uid);
+
+      // 토글 상태 계산
+      const nextStarredUids = hasStarred 
+        ? currentStarredUids.filter(uid => uid !== user.uid)
+        : [...currentStarredUids, user.uid];
+      const nextStars = nextStarredUids.length;
+
       // 상태 업데이트 헬퍼
-      const incrementStarInState = () => {
+      const updateStarInState = () => {
         set(state => ({
-          communityTemplates: state.communityTemplates.map(t =>
-            t.id === templateId ? { ...t, stars: (t.stars || 0) + 1 } : t
+          communityTemplates: state.communityTemplates.map(tmpl =>
+            tmpl.id === templateId ? { ...tmpl, stars: nextStars, starredUids: nextStarredUids } : tmpl
           ),
-          templates: state.templates.map(t =>
-            t.id === templateId ? { ...t, stars: (t.stars || 0) + 1 } : t
+          templates: state.templates.map(tmpl =>
+            tmpl.id === templateId ? { ...tmpl, stars: nextStars, starredUids: nextStarredUids } : tmpl
           )
         }));
-        // 중복 방지 저장
-        starredList.push(templateId);
-        localStorage.setItem('starred_templates', JSON.stringify(starredList));
-        alert(get().t('starSuccessAlert'));
       };
 
       if (!db) {
-        // Fallback: 로컬 Mock 데이터 추천
+        // Fallback: 로컬 Mock 데이터 추천 토글
         try {
           const localDataStr = localStorage.getItem('local_shared_templates') || '[]';
           const localTemplates: any[] = JSON.parse(localDataStr);
-          const updatedTemplates = localTemplates.map(t =>
-            t.id === templateId ? { ...t, stars: (t.stars || 0) + 1 } : t
+          const updatedTemplates = localTemplates.map(tmpl =>
+            tmpl.id === templateId ? { ...tmpl, stars: nextStars, starredUids: nextStarredUids } : tmpl
           );
           localStorage.setItem('local_shared_templates', JSON.stringify(updatedTemplates));
-          incrementStarInState();
+          updateStarInState();
         } catch (err) {
           console.error('Failed to update stars in local mock store', err);
         }
         return;
       }
 
-      // Firestore 추천 수 업
+      // Firestore 추천 토글 반영
       try {
         const docRef = doc(db, 'shared_templates', templateId);
         await updateDoc(docRef, {
-          stars: increment(1)
+          stars: nextStars,
+          starredUids: nextStarredUids
         });
-        incrementStarInState();
+        updateStarInState();
       } catch (err) {
         console.error('Failed to update stars in firestore', err);
       }
@@ -642,6 +678,89 @@ export const useEditorStore = create<EditorState>((set, get) => {
       get().addTab('md', `${template.title} (Forked).md`, content);
       set({ templateStoreOpen: false });
       alert(get().t('forkSuccessAlert'));
+    },
+
+    signInWithGoogle: async () => {
+      if (!auth) {
+        alert('Firebase Auth가 설정되어 있지 않습니다.');
+        return;
+      }
+      set({ authLoading: true });
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        set({ user: result.user, authLoading: false });
+      } catch (err: any) {
+        console.error('Google 로그인 실패:', err);
+        set({ authLoading: false });
+        alert(`로그인 실패: ${err.message}`);
+      }
+    },
+
+    signOutUser: async () => {
+      if (!auth) return;
+      try {
+        await fbSignOut(auth);
+        set({ user: null });
+      } catch (err) {
+        console.error('로그아웃 실패:', err);
+      }
+    },
+
+    initializeAuth: () => {
+      if (!auth) {
+        set({ authLoading: false });
+        return;
+      }
+      onAuthStateChanged(auth, (user) => {
+        set({ user, authLoading: false });
+      });
+    },
+
+    deleteTemplate: async (templateId) => {
+      const { user, t } = get();
+      if (!user) {
+        alert(t('loginRequired'));
+        return false;
+      }
+
+      // 로컬 Mock 템플릿 삭제
+      if (templateId.startsWith('local-tmpl-')) {
+        try {
+          const localDataStr = localStorage.getItem('local_shared_templates') || '[]';
+          const localTemplates: any[] = JSON.parse(localDataStr);
+          const updatedTemplates = localTemplates.filter(t => t.id !== templateId);
+          localStorage.setItem('local_shared_templates', JSON.stringify(updatedTemplates));
+          
+          set(state => ({
+            communityTemplates: state.communityTemplates.filter(t => t.id !== templateId)
+          }));
+          alert(t('deleteSuccess'));
+          return true;
+        } catch (err) {
+          console.error(err);
+          return false;
+        }
+      }
+
+      if (!db) {
+        return false;
+      }
+
+      // Firestore 템플릿 삭제
+      try {
+        const docRef = doc(db, 'shared_templates', templateId);
+        await deleteDoc(docRef);
+        
+        set(state => ({
+          communityTemplates: state.communityTemplates.filter(t => t.id !== templateId)
+        }));
+        alert(t('deleteSuccess'));
+        return true;
+      } catch (err: any) {
+        console.error('Failed to delete template from firestore', err);
+        alert(`${t('deleteFail')}: ${err.message}`);
+        return false;
+      }
     }
   };
 });
@@ -682,6 +801,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     allCategories: '전체 카테고리',
     tabOfficial: '🎈 공식 템플릿',
     tabCommunity: '👥 커뮤니티 공유',
+    tabPrompt: '🤖 AI 프롬프트',
+    tabMine: '👤 내가 올린 템플릿',
     shareBtn: '🔗 공유하기',
     shareTitle: '📢 템플릿 스토어에 공유',
     shareDesc: '현재 편집 중인 마크다운 문서를 공개 스토어에 업로드하여 다른 사람들과 공유해보세요.',
@@ -707,7 +828,22 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     rankBronze: '🥉 3위',
     importBtn: '파일 불러오기',
     importFail: '파일을 불러오지 못했습니다. .json, .xml, .md 형식만 지원합니다.',
-    dropZoneText: '파일을 여기에 드롭하여 새 탭으로 열기'
+    dropZoneText: '파일을 여기에 드롭하여 새 탭으로 열기',
+    loginRequired: '이 기능을 사용하려면 로그인이 필요합니다.',
+    deleteSuccess: '템플릿이 삭제되었습니다.',
+    deleteFail: '템플릿 삭제에 실패했습니다.',
+    confirmDelete: '정말로 이 템플릿을 삭제하시겠습니까?',
+    loginBtn: '구글 로그인',
+    logoutBtn: '로그아웃',
+    myTemplates: '내가 올린 템플릿',
+    isPromptTemplate: '이 템플릿을 AI 프롬프트로 등록',
+    targetModelLabel: '대상 AI 모델',
+    modelGemini: 'Google Gemini',
+    modelGPT: 'OpenAI GPT',
+    modelClaude: 'Anthropic Claude',
+    modelLlama: 'Meta LLaMA',
+    modelGeneral: '공통/기타',
+    filterAllModels: '모든 AI 모델'
   },
   en: {
     title: 'JxmParser Editor',
@@ -741,6 +877,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     author: 'Author',
     download: 'Load Template',
     allCategories: 'All Categories',
+    tabOfficial: '🎈 Official Templates',
+    tabCommunity: '👥 Community Shared',
+    tabPrompt: '🤖 AI Prompts',
+    tabMine: '👤 My Templates',
     sortNewest: 'Newest',
     sortStars: 'Most Starred',
     sortForks: 'Most Forked',
@@ -749,7 +889,22 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     rankBronze: '🥉 3rd',
     importBtn: 'Import File',
     importFail: 'Failed to import file. Only .json, .xml, and .md formats are supported.',
-    dropZoneText: 'Drop files here to open in new tab'
+    dropZoneText: 'Drop files here to open in new tab',
+    loginRequired: 'Login is required to use this feature.',
+    deleteSuccess: 'Template has been deleted.',
+    deleteFail: 'Failed to delete template.',
+    confirmDelete: 'Are you sure you want to delete this template?',
+    loginBtn: 'Google Login',
+    logoutBtn: 'Sign Out',
+    myTemplates: 'My Templates',
+    isPromptTemplate: 'Register as AI Prompt Template',
+    targetModelLabel: 'Target AI Model',
+    modelGemini: 'Google Gemini',
+    modelGPT: 'OpenAI GPT',
+    modelClaude: 'Anthropic Claude',
+    modelLlama: 'Meta LLaMA',
+    modelGeneral: 'General',
+    filterAllModels: 'All AI Models'
   }
-};
+};;
 

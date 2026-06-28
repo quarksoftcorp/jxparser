@@ -1,0 +1,292 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ---- [공통 보안 함수] ----
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    // ---- [앱 전역 설정 및 공통 메타데이터] ----
+    match /app_config/{document=**} {
+      allow read: if true; 
+      allow write: if false; 
+    }
+    match /hobbies/{document=**} {
+      allow read: if true; // 비회원 로드 허용
+      allow write: if false;
+    }
+
+    // ---- [추가 메타데이터: 지역, 가치관, 선호 음식] ----
+    match /regions/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /coreValues/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /favoriteFoods/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /foods/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /favorite_foods/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- [관리자 전용 데이터] ----
+    // 클라이언트 앱에서의 접근을 원천 차단. 관리자 페이지(Next.js)는 Admin SDK를 사용하므로 이 규칙을 무시하고 자유롭게 접근 가능.
+    match /admin_users/{document=**} {
+      allow read, write: if false;
+    }
+    match /adminLogs/{document=**} {
+      allow read, write: if false;
+    }
+
+
+    // ---- [사용자 데이터] ----
+    match /users/{userId} {
+      allow read: if true; // 웹 비회원 조회 허용
+      allow create: if isOwner(userId);
+      // 본인이 수정하더라도 활동 점수나 취미별 점수는 직접 손대지 못하게 차단
+      allow update: if (
+        // 본인 업데이트: activityScore, hobbyScores 직접 수정 금지
+        (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['activityScore', 'hobbyScores']))
+        // 타인: reportCount 필드만 수정 허용
+        || (isAuthenticated() && resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount']))
+      );
+      // 삭제: 앱 내 탈퇴 기능을 통해 본인만 삭제 가능
+      allow delete: if isOwner(userId);
+      
+      // 하위 컬렉션: 알림 (notifications)
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if isAuthenticated();
+        allow update, delete: if isOwner(userId);
+      }
+    }
+
+    // ---- [개인정보 동의 내역 관리] ----
+    match /privacy_consents/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ---- [채팅 (브롭)] ----
+    match /chats/{chatId} {
+      // 참여자(participants)에 자신이 포함된 경우에만 방 생성/읽기/수정 허용
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants;
+      allow get: if isAuthenticated() && (resource == null || request.auth.uid in resource.data.participants || chatId.matches('.*' + request.auth.uid + '.*'));
+      allow list: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow update: if isAuthenticated() && (request.auth.uid in resource.data.participants || (chatId.matches('.*' + request.auth.uid + '.*') && request.auth.uid in request.resource.data.participants));
+      allow delete: if isAuthenticated() && (request.auth.uid in resource.data.participants || chatId.matches('.*' + request.auth.uid + '.*'));
+      
+      // 하위 컬렉션: 메시지
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants || chatId.matches('.*' + request.auth.uid + '.*'));
+        allow create: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants || chatId.matches('.*' + request.auth.uid + '.*'));
+        allow update: if isAuthenticated() && (
+          (resource != null && request.auth.uid == resource.data.senderId) || 
+          (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'expiresAt', 'text', 'imageUrl', 'isDeleted', 'rpsState', 'opponentChoice', 'opponentId', 'result']))
+        );
+        allow delete: if isAuthenticated() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants || chatId.matches('.*' + request.auth.uid + '.*'));
+      }
+    }
+
+    // ---- [커뮤니티 게시글 및 댓글/좋아요] ----
+    match /community_posts/{postId} {
+      allow read: if true; // 비회원열람 허용
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.authorId;
+      // 작성자는 전체 수정 가능. 이외 유저는 좋아요, 댓글수 변경만 허용
+      allow update: if isAuthenticated() && (
+        (resource != null && request.auth.uid == resource.data.authorId) || 
+        (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount', 'comments', 'views', 'reportCount']))
+      );
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.authorId;
+      
+      match /comments/{commentId} {
+        allow read: if true; // 비회원열람 허용
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.authorId;
+        allow update: if isAuthenticated() && (
+          (resource != null && request.auth.uid == resource.data.authorId) || 
+          (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'likedUserIds', 'rpsState', 'opponentChoice', 'opponentId', 'result']))
+        );
+        allow delete: if isAuthenticated() && (
+          request.auth.uid == resource.data.authorId || 
+          get(/databases/$(database)/documents/community_posts/$(postId)).data.authorId == request.auth.uid
+        );
+      }
+
+      match /likes/{userId} {
+        allow read: if true; // 비회원열람 허용
+        allow write: if isOwner(userId) || (
+          isAuthenticated() && get(/databases/$(database)/documents/community_posts/$(postId)).data.authorId == request.auth.uid
+        );
+      }
+    }
+
+    // ---- [해시태그] ----
+    match /hashtags/{tagId} {
+      allow read: if true; // 비회원열람 허용
+      allow create, update: if isAuthenticated(); 
+      allow delete: if false;
+    }
+
+    // ---- [질문 관리 (Questions)] ----
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.fromUserId;
+      allow update: if isAuthenticated() && (
+        (resource != null && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId)) ||
+        (resource != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount', 'comments', 'views']))
+      );
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+    }
+
+    // ---- [고객센터 및 문의 내역] ----
+    match /support_tickets/{supportId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false; 
+    }
+    
+    // ---- [유저/게시글 신고 내역] ----
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.reporterId;
+      allow read, update, delete: if false;
+    }
+
+    // ---- [차단/정지 내역] ----
+    match /bans/{banId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ---- [탈퇴/제재 이력 (재가입 방지)] ----
+    match /banned_records/{recordId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    // ---- [포인트 증감 내역] ----
+    match /point_transactions/{historyId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if false;
+    }
+
+    // ---- [활동 점수 내역] ----
+    match /activity_histories/{historyId} {
+      allow read: if isAuthenticated();
+      // 활동 점수 기록은 Cloud Functions에서만 생성할 수 있습니다.
+      allow create: if false;
+      allow update, delete: if false;
+    }
+
+    // ---- [친구 목록] ----
+    match /friends/{friendId} {
+      allow read: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && request.auth.uid in resource.data.users;
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.users;
+    }
+
+    // ---- [친구 요청] ----
+    match /friend_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.fromUserId || request.auth.uid == request.resource.data.toUserId);
+      allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+    }
+
+    // ---- [친구 신청 쿨다운] ----
+    match /friend_cooldowns/{requestId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && requestId.matches('.*' + request.auth.uid + '.*');
+      allow delete: if isAuthenticated() && requestId.matches('.*' + request.auth.uid + '.*');
+    }
+
+    // ---- [접속 로그 내역] ----
+    match /access_logs/{logId} {
+      allow create: if isAuthenticated();
+      // 조회/수정/삭제 권한은 앱클라이언트에는 없음 
+      allow read, update, delete: if false;
+    }
+
+    // ---- [퍼널 로그 내역] ----
+    match /funnel_logs/{logId} {
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow read, update, delete: if false;
+    }
+
+
+    // ---- [채팅 메타데이터 로그] ----
+    match /chat_logs/{logId} {
+      allow create: if isAuthenticated();
+      // 조회/수정/삭제 권한은 앱클라이언트에는 없음 (통신비밀보호법 3개월 보관용)
+      allow read, update, delete: if false;
+    }
+
+    // ---- [AI 얼굴/포즈 인증 로그] ----
+    match /liveness_logs/{logId} {
+      // 인증된 사용자만 본인 로그 생성 가능 (AI 인증 결과 저장)
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      // 조회/수정/삭제는 앱 클라이언트 불가 (Admin SDK만 가능)
+      allow read, update, delete: if false;
+    }
+
+    // ---- [사진 인증 검증 요청 내역] ----
+    match /photo_verifications/{docId} {
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if false; 
+    }
+
+    // ---- [시스템 설정] ----
+    match /system_settings/{settingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- [공지사항] ----
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- [해시태그 (중복룰)] ----
+    match /hashtags/{tagId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ---- [가입 이력 관리] ----
+    // 클라이언트의 직접 접근을 차단하고 NestJS 백엔드(Admin SDK)에서만 처리합니다.
+    match /signup_history/{phoneHash} {
+      allow read, write: if false;
+    }
+
+    // ---- [사용자 계정 정지/탈퇴 기록 (차단)] ----
+    // 클라이언트의 직접 접근을 차단하고 NestJS 백엔드(Admin SDK)에서만 처리합니다.
+    match /banned_records/{phoneHash} {
+      allow read, write: if false;
+    }
+
+    // ---- [공유 템플릿 스토어 (shared_templates)] ----
+    match /shared_templates/{templateId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stars', 'forks', 'starredUids'])
+                    || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // 기타 모든 미정의 문서는 차단 (안전 제일)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

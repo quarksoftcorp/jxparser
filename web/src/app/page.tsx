@@ -23,7 +23,14 @@ export default function Home() {
     loadCachedFiles,
     exportActiveFile,
     setTemplateStoreOpen,
-    setShareOpen
+    setShareOpen,
+    
+    // Auth 연동
+    user,
+    authLoading,
+    signInWithGoogle,
+    signOutUser,
+    initializeAuth
   } = useEditorStore();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -81,9 +88,10 @@ export default function Home() {
     }
   };
 
-  // 마운트 시 로컬 캐시/MMKV 파일 복구 수행
+  // 마운트 시 로컬 캐시/MMKV 파일 복구 및 Auth 초기화 수행
   useEffect(() => {
     const init = async () => {
+      initializeAuth();
       await loadCachedFiles();
       // 캐시 복구 후에도 열린 파일이 없으면 기본 JSON 예제 생성
       if (useEditorStore.getState().files.length === 0) {
@@ -114,48 +122,48 @@ export default function Home() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans relative"
+      className="flex flex-col h-screen bg-[#181818] text-[#cccccc] overflow-hidden font-sans relative"
     >
       {/* 1. 상단 글로벌 헤더 & 컨트롤 바 */}
-      <header className="flex flex-wrap items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800 shrink-0 gap-4">
+      <header className="flex flex-wrap items-center justify-between px-5 py-2.5 bg-[#1e1e1e] border-b border-[#2d2d2d] shrink-0 gap-4">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <span className="font-bold text-white text-lg tracking-wider">JX</span>
+          <div className="w-8 h-8 rounded bg-[#2d2d2d] border border-[#3c3c3c] flex items-center justify-center overflow-hidden shadow-inner">
+            <img src="/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
           </div>
           <div>
-            <h1 id="main-title" className="text-lg font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-indigo-300 bg-clip-text text-transparent">
+            <h1 id="main-title" className="text-xs font-bold tracking-tight text-[#e0e0e0] flex items-center gap-2">
               {t('title')}
             </h1>
-            <p className="text-xs text-slate-400">{t('subtitle')}</p>
+            <p className="text-[10px] text-[#858585]">{t('subtitle')}</p>
           </div>
         </div>
 
         {/* 새 탭 & 공통 동작 */}
-        <div className="flex items-center flex-wrap gap-2.5">
+        <div className="flex items-center flex-wrap gap-1.5">
           {/* 포맷 추가 버튼들 */}
           <button
             id="btn-add-json"
             onClick={() => addTab('json')}
-            className="px-3.5 py-1.5 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-800 text-cyan-300 text-xs font-semibold rounded-lg transition"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] border border-[#2d2d2d] hover:border-[#3c3c3c] text-[#cccccc] text-[11px] font-semibold rounded transition"
           >
             + {t('newJson')}
           </button>
           <button
             id="btn-add-xml"
             onClick={() => addTab('xml')}
-            className="px-3.5 py-1.5 bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-800 text-indigo-300 text-xs font-semibold rounded-lg transition"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] border border-[#2d2d2d] hover:border-[#3c3c3c] text-[#cccccc] text-[11px] font-semibold rounded transition"
           >
             + {t('newXml')}
           </button>
           <button
             id="btn-add-md"
             onClick={() => addTab('md')}
-            className="px-3.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800 text-rose-300 text-xs font-semibold rounded-lg transition"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] border border-[#2d2d2d] hover:border-[#3c3c3c] text-[#cccccc] text-[11px] font-semibold rounded transition"
           >
             + {t('newMd')}
           </button>
 
-          <span className="h-6 w-[1px] bg-slate-800 mx-1"></span>
+          <span className="h-4 w-[1px] bg-[#2d2d2d] mx-0.5"></span>
 
           {/* 스토어 공유하기 버튼 */}
           <button
@@ -167,7 +175,7 @@ export default function Home() {
               }
               setShareOpen(true);
             }}
-            className="px-4 py-1.5 bg-gradient-to-r from-emerald-600/80 to-teal-600/80 hover:from-emerald-550 hover:to-teal-550 text-white text-xs font-semibold rounded-lg transition border border-emerald-800/40 shadow-md shadow-emerald-500/5"
+            className="px-2.5 py-1 bg-[#0e639c] hover:bg-[#1177bb] text-white text-[11px] font-semibold rounded transition"
           >
             {t('shareBtn')}
           </button>
@@ -177,7 +185,7 @@ export default function Home() {
             id="btn-format-code"
             onClick={formatActiveFile}
             disabled={!activeFile}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-semibold rounded-lg transition border border-slate-700"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] disabled:opacity-30 disabled:cursor-not-allowed text-[#cccccc] text-[11px] font-semibold rounded transition border border-[#2d2d2d]"
           >
             ✨ {t('format')}
           </button>
@@ -186,7 +194,7 @@ export default function Home() {
           <button
             id="btn-view-examples"
             onClick={() => setExampleOpen(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow-md shadow-indigo-500/10"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] text-[#cccccc] text-[11px] font-semibold rounded transition border border-[#2d2d2d]"
           >
             💡 {t('example')}
           </button>
@@ -195,7 +203,7 @@ export default function Home() {
           <button
             id="btn-open-store"
             onClick={() => setTemplateStoreOpen(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-cyan-600 to-indigo-700 hover:from-cyan-500 hover:to-indigo-600 text-white text-xs font-semibold rounded-lg transition shadow-md shadow-cyan-500/10 border border-slate-700/60"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] text-[#cccccc] text-[11px] font-semibold rounded transition border border-[#2d2d2d]"
           >
             {t('storeBtn')}
           </button>
@@ -204,7 +212,7 @@ export default function Home() {
           <button
             id="btn-import-file"
             onClick={triggerFileInput}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1 bg-[#2d2d2d] hover:bg-[#333333] text-[#cccccc] text-[11px] font-semibold rounded transition border border-[#2d2d2d] flex items-center gap-1 cursor-pointer"
           >
             📂 {t('importBtn')}
           </button>
@@ -214,20 +222,53 @@ export default function Home() {
             id="btn-export-code"
             onClick={exportActiveFile}
             disabled={!activeFile}
-            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-550 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition shadow-md shadow-emerald-500/10"
+            className="px-2.5 py-1 bg-[#0e639c] hover:bg-[#1177bb] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[11px] font-semibold rounded transition"
           >
             💾 {t('export')}
           </button>
 
-          <span className="h-6 w-[1px] bg-slate-800 mx-1"></span>
+          <span className="h-4 w-[1px] bg-[#2d2d2d] mx-0.5"></span>
+
+          {/* 구글 로그인 영역 */}
+          <div className="flex items-center">
+            {authLoading ? (
+              <span className="text-[10px] text-[#858585]">...</span>
+            ) : user ? (
+              <div className="flex items-center gap-1.5 bg-[#181818] px-2 py-0.5 rounded border border-[#2d2d2d]">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Profile" className="w-4 h-4 rounded-full border border-[#2d2d2d]" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-[#2d2d2d] border border-[#2d2d2d] flex items-center justify-center text-[8px]">👤</span>
+                )}
+                <span className="text-[11px] font-medium text-[#b3b3b3] max-w-[70px] truncate">{user.displayName}</span>
+                <button
+                  id="btn-logout"
+                  onClick={signOutUser}
+                  className="text-[9px] text-rose-400 hover:text-rose-350 transition cursor-pointer pl-1 font-bold"
+                >
+                  {t('logoutBtn')}
+                </button>
+              </div>
+            ) : (
+              <button
+                id="btn-google-login"
+                onClick={signInWithGoogle}
+                className="px-2.5 py-1 bg-[#0e639c] hover:bg-[#1177bb] text-white text-[11px] font-bold rounded transition flex items-center gap-1 cursor-pointer"
+              >
+                🔑 {t('loginBtn')}
+              </button>
+            )}
+          </div>
+
+          <span className="h-4 w-[1px] bg-[#2d2d2d] mx-0.5"></span>
 
           {/* 다국어 전환 버튼 */}
-          <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+          <div className="flex bg-[#181818] rounded p-0.5 border border-[#2d2d2d]">
             <button
               id="btn-locale-ko"
               onClick={() => setLocale('ko')}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition ${
-                locale === 'ko' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2 py-0.5 rounded-sm text-[9px] font-bold transition ${
+                locale === 'ko' ? 'bg-[#2d2d2d] text-white' : 'text-[#858585] hover:text-[#cccccc]'
               }`}
             >
               KO
@@ -235,8 +276,8 @@ export default function Home() {
             <button
               id="btn-locale-en"
               onClick={() => setLocale('en')}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition ${
-                locale === 'en' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2 py-0.5 rounded-sm text-[9px] font-bold transition ${
+                locale === 'en' ? 'bg-[#2d2d2d] text-white' : 'text-[#858585] hover:text-[#cccccc]'
               }`}
             >
               EN
@@ -247,29 +288,35 @@ export default function Home() {
 
       {/* 2. 가로 탭 바 영역 */}
       {files.length > 0 && (
-        <div className="flex items-center px-4 py-1 bg-slate-950 border-b border-slate-800/80 shrink-0 overflow-x-auto gap-1">
+        <div className="flex items-center px-4 py-0.5 bg-[#181818] border-b border-[#2d2d2d] shrink-0 overflow-x-auto gap-1">
           {files.map(file => {
             const isActive = file.id === activeTabId;
             return (
               <div
                 key={file.id}
                 onClick={() => setActiveTab(file.id)}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-t-lg text-xs font-mono transition cursor-pointer select-none border-t-2 ${
+                className={`flex items-center space-x-2 px-2.5 py-1 rounded-t-sm text-[11px] font-mono transition cursor-pointer select-none border-t ${
                   isActive
-                    ? 'bg-slate-900 border-t-cyan-400 text-slate-100'
-                    : 'bg-slate-950 hover:bg-slate-900/40 border-t-transparent text-slate-400 hover:text-slate-200'
+                    ? 'bg-[#1e1e1e] border-t-[#0e639c] text-[#e0e0e0]'
+                    : 'bg-[#252526] hover:bg-[#29292a] border-t-transparent text-[#858585] hover:text-[#cccccc]'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  file.type === 'json' ? 'bg-cyan-400' : file.type === 'xml' ? 'bg-indigo-400' : 'bg-rose-400'
-                }`} />
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border transition-colors duration-200 ${
+                  file.type === 'json'
+                    ? 'bg-[#4fc1ff]/10 border-[#4fc1ff]/30 text-[#4fc1ff]'
+                    : file.type === 'xml'
+                      ? 'bg-[#ce9178]/10 border-[#ce9178]/30 text-[#ce9178]'
+                      : 'bg-[#4ec9b0]/10 border-[#4ec9b0]/30 text-[#4ec9b0]'
+                }`}>
+                  {file.type === 'json' ? '{}' : file.type === 'xml' ? '<>' : 'MD'}
+                </span>
                 <span className="truncate max-w-[120px]">{file.name}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     closeTab(file.id);
                   }}
-                  className="text-slate-500 hover:text-slate-300 transition text-[10px] pl-1"
+                  className="text-[#858585] hover:text-[#cccccc] transition text-[9px] pl-1"
                 >
                   ✕
                 </button>
@@ -280,7 +327,7 @@ export default function Home() {
       )}
 
       {/* 3. 에디터 및 트리 뷰어 컨텐츠 영역 */}
-      <div className="flex-1 flex overflow-hidden p-6 gap-6 bg-slate-950">
+      <div className="flex-1 flex overflow-hidden p-4 gap-4 bg-[#181818]">
         {activeFile ? (
           <>
             <div className="flex-1 h-full min-w-[300px]">
@@ -291,19 +338,19 @@ export default function Home() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-xl p-12 bg-slate-900/10">
-            <span className="text-5xl mb-4">🔮</span>
-            <p className="text-sm font-semibold mb-2">{t('noTabs')}</p>
-            <div className="flex gap-2.5 mt-4">
+          <div className="flex-1 flex flex-col items-center justify-center text-[#858585] border border-dashed border-[#2d2d2d] rounded p-12 bg-[#1e1e1e]">
+            <span className="text-4xl mb-3">🔮</span>
+            <p className="text-xs font-semibold mb-2">{t('noTabs')}</p>
+            <div className="flex gap-2 mt-4">
               <button
                 onClick={() => addTab('json')}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition"
+                className="px-3 py-1.5 bg-[#2d2d2d] hover:bg-[#333333] border border-[#2d2d2d] hover:border-[#3c3c3c] text-white text-xs font-semibold rounded transition"
               >
                 {t('newJson')}
               </button>
               <button
                 onClick={() => setExampleOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 text-white text-xs font-semibold rounded-lg transition"
+                className="px-3 py-1.5 bg-[#0e639c] hover:bg-[#1177bb] text-white text-xs font-semibold rounded transition"
               >
                 {t('example')}
               </button>
@@ -333,11 +380,11 @@ export default function Home() {
 
       {/* 드래그앤드롭 오버레이 */}
       {isDragging && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md border-2 border-dashed border-cyan-500/40 m-4 rounded-2xl pointer-events-none animate-fadeIn">
-          <div className="flex flex-col items-center gap-4 text-center p-8 bg-slate-900/60 rounded-xl border border-slate-800 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#181818]/85 backdrop-blur-sm border border-dashed border-[#0e639c]/40 m-4 rounded pointer-events-none animate-fadeIn">
+          <div className="flex flex-col items-center gap-4 text-center p-8 bg-[#1e1e1e] rounded border border-[#2d2d2d] shadow-2xl">
             <span className="text-6xl animate-bounce">📥</span>
-            <p className="text-lg font-bold text-cyan-300">{t('dropZoneText')}</p>
-            <p className="text-xs text-slate-400">JSON, XML, Markdown (.md)</p>
+            <p className="text-base font-bold text-[#4fc1ff]">{t('dropZoneText')}</p>
+            <p className="text-xs text-[#858585]">JSON, XML, Markdown (.md)</p>
           </div>
         </div>
       )}

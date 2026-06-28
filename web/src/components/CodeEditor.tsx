@@ -72,20 +72,20 @@ export const CodeEditor: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-[#1e1e1e] border border-[#2d2d2d] rounded-md overflow-hidden">
       {/* 에디터 헤더 */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
+      <div className="flex items-center justify-between px-4 py-2 bg-[#1e1e1e] border-b border-[#2d2d2d] text-[11px]">
         <div className="flex items-center space-x-2">
-          <span className="text-emerald-400 font-semibold uppercase">{activeFile.type}</span>
-          <span className="text-slate-400">|</span>
-          <span className="text-slate-200 font-mono">{activeFile.name}</span>
+          <span className="text-[#4ec9b0] font-semibold uppercase">{activeFile.type}</span>
+          <span className="text-[#555555]">|</span>
+          <span className="text-[#b3b3b3] font-mono">{activeFile.name}</span>
           {activeFile.isDirty && (
-            <span className="w-2 h-2 rounded-full bg-amber-500" title="수정됨" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="수정됨" />
           )}
         </div>
         {activeFile.error && (
           <span className="text-rose-400 font-mono max-w-[50%] truncate" title={activeFile.error}>
-            ⚠️ 파싱 에러: {activeFile.error}
+            ⚠️ {activeFile.error}
           </span>
         )}
       </div>
@@ -97,7 +97,7 @@ export const CodeEditor: React.FC = () => {
           value={activeFile.content}
           onChange={(e) => updateContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full h-full p-4 bg-slate-950 text-slate-200 font-mono text-sm leading-relaxed focus:outline-none resize-none overflow-y-auto selection:bg-cyan-500/30"
+          className="w-full h-full p-5 bg-[#1e1e1e] text-[#cccccc] font-mono text-[13px] leading-6 focus:outline-none resize-none overflow-y-auto selection:bg-[#264f78]"
           spellCheck={false}
           placeholder="여기에 소스 코드를 입력하거나 트리 구조를 클릭해 보세요..."
         />

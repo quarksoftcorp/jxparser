@@ -25,14 +25,14 @@ export const ExampleViewer: React.FC = () => {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#181818]/85 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg bg-[#252526] border border-[#3c3c3c] rounded overflow-hidden shadow-2xl">
         {/* 모달 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-800">
-          <h3 className="text-lg font-bold text-slate-100">💡 사용 예제(Example) 선택</h3>
+        <div className="flex items-center justify-between px-6 py-4 bg-[#252526] border-b border-[#3c3c3c]">
+          <h3 className="text-sm font-bold text-white">💡 사용 예제(Example) 선택</h3>
           <button
             onClick={() => setExampleOpen(false)}
-            className="text-slate-400 hover:text-slate-200 transition text-lg"
+            className="text-[#858585] hover:text-[#cccccc] transition text-lg"
           >
             ✕
           </button>
@@ -40,7 +40,7 @@ export const ExampleViewer: React.FC = () => {
 
         {/* 모달 바디 */}
         <div className="p-6 space-y-4">
-          <p className="text-sm text-slate-400">
+          <p className="text-xs text-[#858585]">
             원하는 형식의 사용 예제를 선택하면 새 편집 탭이 자동으로 생성되고 깔끔한 트리 구조로 시각화됩니다.
           </p>
 
@@ -49,30 +49,30 @@ export const ExampleViewer: React.FC = () => {
               <button
                 key={ex.type}
                 onClick={() => loadExample(ex.type)}
-                className="w-full text-left p-4 bg-slate-800/40 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition flex justify-between items-center group"
+                className="w-full text-left p-4 bg-[#1e1e1e] hover:bg-[#2d2d2d] border border-[#3c3c3c] hover:border-[#555555] rounded transition flex justify-between items-center group cursor-pointer"
               >
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition">
+                    <span className="text-xs font-bold text-white group-hover:text-[#4fc1ff] transition">
                       {ex.title}
                     </span>
-                    <span className="uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                    <span className="uppercase text-[9px] px-1.5 py-0.5 rounded bg-[#3a3d41] text-[#cccccc] font-mono">
                       {ex.type}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 leading-normal">{ex.desc}</p>
+                  <p className="text-[11px] text-[#858585] leading-normal">{ex.desc}</p>
                 </div>
-                <span className="text-slate-500 group-hover:text-cyan-400 transition pl-4">➔</span>
+                <span className="text-[#858585] group-hover:text-[#4fc1ff] transition pl-4">➔</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* 모달 푸터 */}
-        <div className="px-6 py-3 bg-slate-850/50 border-t border-slate-800 flex justify-end">
+        <div className="px-6 py-3 bg-[#252526] border-t border-[#3c3c3c] flex justify-end">
           <button
             onClick={() => setExampleOpen(false)}
-            className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-slate-100 transition"
+            className="px-4 py-2 text-xs font-semibold bg-[#3a3d41] hover:bg-[#464b50] border border-[#3c3c3c] text-white rounded transition cursor-pointer"
           >
             닫기
           </button>

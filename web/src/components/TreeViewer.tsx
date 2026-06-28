@@ -29,8 +29,8 @@ export const TreeViewer: React.FC<TreeViewerProps> = ({ tree }) => {
   };
 
   return (
-    <div className="p-4 bg-slate-900 text-slate-100 rounded-lg font-mono text-sm overflow-auto h-full border border-slate-700">
-      <div className="text-slate-400 mb-2 pb-2 border-b border-slate-800 flex justify-between items-center">
+    <div className="p-4 bg-[#1e1e1e] text-[#cccccc] rounded font-mono text-sm overflow-auto h-full border border-[#3c3c3c]">
+      <div className="text-[#858585] mb-2 pb-2 border-b border-[#3c3c3c] flex justify-between items-center">
         <span>🌳 트리 구조 뷰어 (클릭하여 편집 가능)</span>
       </div>
       {tree.children && tree.children.length > 0 ? (
@@ -38,7 +38,7 @@ export const TreeViewer: React.FC<TreeViewerProps> = ({ tree }) => {
           <NodeItem key={child.id} node={child} onUpdate={handleNodeUpdate} />
         ))
       ) : (
-        <div className="text-slate-500 italic p-2">비어 있거나 해석할 수 없는 구조입니다.</div>
+        <div className="text-[#858585] italic p-2">비어 있거나 해석할 수 없는 구조입니다.</div>
       )}
     </div>
   );
@@ -65,23 +65,23 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
   const getTypeDetails = (type: string) => {
     switch (type) {
       case 'object':
-        return { color: 'text-cyan-400', label: '{ }', isContainer: true };
+        return { color: 'text-[#569cd6]', label: '{ }', isContainer: true };
       case 'array':
-        return { color: 'text-yellow-400', label: '[ ]', isContainer: true };
+        return { color: 'text-[#4ec9b0]', label: '[ ]', isContainer: true };
       case 'xml-element':
-        return { color: 'text-indigo-400', label: '< >', isContainer: hasChildren };
+        return { color: 'text-[#569cd6]', label: '< >', isContainer: hasChildren };
       case 'xml-attribute':
-        return { color: 'text-emerald-400', label: '@', isContainer: false };
+        return { color: 'text-[#9cdcfe]', label: '@', isContainer: false };
       case 'md-heading':
-        return { color: 'text-rose-400', label: 'H#', isContainer: false };
+        return { color: 'text-[#c586c0]', label: 'H#', isContainer: false };
       case 'md-paragraph':
-        return { color: 'text-sky-400', label: '¶', isContainer: false };
+        return { color: 'text-[#d4d4d4]', label: '¶', isContainer: false };
       case 'md-list-item':
-        return { color: 'text-amber-400', label: '•', isContainer: false };
+        return { color: 'text-[#dcdcaa]', label: '•', isContainer: false };
       case 'md-code-block':
-        return { color: 'text-purple-400', label: '`', isContainer: true };
+        return { color: 'text-[#b5cea8]', label: '`', isContainer: true };
       default:
-        return { color: 'text-slate-300', label: 'val', isContainer: false };
+        return { color: 'text-[#cccccc]', label: 'val', isContainer: false };
     }
   };
 
@@ -123,7 +123,7 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
   return (
     <div className="my-1">
       <div
-        className="flex items-center hover:bg-slate-800/60 rounded px-2 py-1 transition group cursor-pointer"
+        className="flex items-center hover:bg-[#252526] rounded px-2 py-0.5 transition group cursor-pointer"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {/* 접기/펼치기 화살표 */}
@@ -133,7 +133,7 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
               e.stopPropagation();
               toggleExpand();
             }}
-            className="mr-1 text-slate-500 hover:text-slate-300 focus:outline-none"
+            className="mr-1 text-[#666666] hover:text-[#cccccc] focus:outline-none"
           >
             {isExpanded ? '▼' : '▶'}
           </button>
@@ -142,7 +142,7 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
         )}
 
         {/* 타입 배지 */}
-        <span className={`mr-2 font-bold text-xs ${color} px-1.5 py-0.5 bg-slate-950/60 rounded`}>
+        <span className={`mr-2 font-bold text-[9px] ${color} px-1.5 py-0.5 border border-[#2d2d2d] bg-transparent rounded`}>
           {label}
         </span>
 
@@ -155,20 +155,20 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
               onChange={(e) => setEditKey(e.target.value)}
               onBlur={handleKeySave}
               onKeyDown={(e) => e.key === 'Enter' && handleKeySave()}
-              className="bg-slate-950 border border-cyan-500 rounded px-1 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="bg-[#181818] border border-[#0e639c] rounded px-1 text-[#cccccc] text-xs focus:outline-none focus:ring-1 focus:ring-[#0e639c]"
               autoFocus
             />
           ) : (
             <span
               onClick={() => setIsEditingKey(true)}
-              className="font-bold text-cyan-300 hover:underline truncate"
+              className="font-semibold text-[#80dbff] hover:text-[#4fc1ff] transition truncate"
             >
               {node.key}
             </span>
           )}
 
           {/* 구분자 */}
-          {!isContainer && <span className="mx-1.5 text-slate-500">:</span>}
+          {!isContainer && <span className="mx-1 text-[#555555]">:</span>}
 
           {/* 값 (Value) */}
           {!isContainer && (
@@ -180,13 +180,13 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onUpdate, depth = 0 }) => {
                   onChange={(e) => setEditValue(e.target.value)}
                   onBlur={handleValueSave}
                   onKeyDown={(e) => e.key === 'Enter' && handleValueSave()}
-                  className="bg-slate-950 border border-yellow-500 rounded px-1 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 w-full"
+                  className="bg-[#181818] border border-[#0e639c] rounded px-1 text-[#cccccc] text-xs focus:outline-none focus:ring-1 focus:ring-[#0e639c] w-full"
                   autoFocus
                 />
               ) : (
                 <span
                   onClick={() => setIsEditingValue(true)}
-                  className="text-amber-200 hover:underline truncate block"
+                  className="text-[#e5a285] hover:text-[#ce9178] transition truncate block"
                 >
                   {node.value === null ? 'null' : String(node.value)}
                 </span>
